@@ -3,6 +3,20 @@ const app = express();
 const PORT = 3000;
 
 const db = require('./db');
+const multer = require('multer');
+
+// cấu hình nơi lưu file
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, 'public/uploads/');
+  },
+  filename: (req, file, cb) => {
+    const uniqueName = Date.now() + '-' + file.originalname;
+    cb(null, uniqueName);
+  }
+});
+
+const upload = multer({ storage: storage });
 
 app.use(express.json());
 app.use(express.static('public'));
@@ -78,30 +92,29 @@ app.get('/api/products', (req, res) => {
   });
 });
 
-// GET product by id
-app.get('/api/products/:id', (req, res) => {
-  const { id } = req.params;
+app.get('/api/products', (req, res) => {
+  const sql = `
+    SELECT p.*, c.name AS category_name
+    FROM products p
+    LEFT JOIN categories c ON p.category_id = c.id
+  `;
 
-  db.query(
-    'SELECT * FROM products WHERE id = ?',
-    [id],
-    (err, result) => {
-      if (err) return res.status(500).send(err);
-      res.json(result[0]);
-    }
-  );
+  db.query(sql, (err, result) => {
+    if (err) return res.status(500).send(err);
+    res.json(result);
+  });
 });
 
-// POST product
-app.post('/api/products', (req, res) => {
+app.post('/api/products', upload.single('image'), (req, res) => {
   const { name, price, category_id } = req.body;
+  const image = req.file ? req.file.filename : null;
 
   db.query(
-    'INSERT INTO products (name, price, category_id) VALUES (?, ?, ?)',
-    [name, price, category_id],
+    'INSERT INTO products (name, price, category_id, image) VALUES (?, ?, ?, ?)',
+    [name, price, category_id, image],
     (err) => {
       if (err) return res.status(500).send(err);
-      res.send('Thêm sản phẩm thành công');
+      res.send('Thêm sản phẩm + ảnh thành công');
     }
   );
 });
