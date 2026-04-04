@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>PC Shop</title>
+  <title>PC Shop Admin</title>
 
   <!-- Bootstrap -->
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
@@ -11,19 +11,19 @@
 
 <div class="container mt-5">
 
-  <h1 class="text-center mb-4">PC Shop</h1>
+  <h1 class="text-center mb-4">Quản lý sản phẩm PC</h1>
 
   <!-- FORM -->
   <div class="card shadow p-4 mb-4">
     <h4 class="mb-3">Thêm sản phẩm</h4>
 
     <div class="row g-2">
-      <div class="col-md-3">
-        <input id="name" class="form-control" placeholder="Tên sản phẩm">
+      <div class="col-md-4">
+        <input id="name" class="form-control" placeholder="Tên sản phẩm (ví dụ: CPU Intel i7 12700K)">
       </div>
 
       <div class="col-md-2">
-        <input id="price" class="form-control" placeholder="Giá">
+        <input id="price" class="form-control" placeholder="Giá (VD: 5000000)">
       </div>
 
       <div class="col-md-3">
@@ -34,24 +34,46 @@
         <input type="file" id="image" class="form-control">
       </div>
 
-      <div class="col-md-2">
-        <button class="btn btn-primary w-100" onclick="addProduct()">Thêm</button>
+      <div class="col-md-1">
+        <button class="btn btn-primary w-100" onclick="addProduct()">+</button>
       </div>
     </div>
   </div>
 
-  <!-- DANH SÁCH -->
-  <div id="product-container"></div>
+  <!-- TABLE -->
+  <div class="card shadow">
+    <div class="card-body">
+
+      <table class="table table-bordered table-hover align-middle">
+        <thead class="table-dark text-center">
+          <tr>
+            <th>ID</th>
+            <th>Ảnh</th>
+            <th>Tên sản phẩm</th>
+            <th>Giá</th>
+            <th>Danh mục</th>
+            <th>Hành động</th>
+          </tr>
+        </thead>
+        <tbody id="product-table"></tbody>
+      </table>
+
+    </div>
+  </div>
 
 </div>
 
 <script>
+
+let categories = [];
 
 // ================= CATEGORY =================
 function loadCategories() {
   fetch('/api/categories')
     .then(res => res.json())
     .then(data => {
+      categories = data;
+
       const select = document.getElementById('category');
       select.innerHTML = '';
 
@@ -70,64 +92,54 @@ function loadProducts() {
     .then(res => res.json())
     .then(data => {
 
-      const container = document.getElementById('product-container');
-      container.innerHTML = '';
-
-      const group = {};
+      const table = document.getElementById('product-table');
+      table.innerHTML = '';
 
       data.forEach(p => {
-        const cat = p.category_name || "Chưa phân loại";
-        if (!group[cat]) group[cat] = [];
-        group[cat].push(p);
+
+        const row = document.createElement('tr');
+
+        row.innerHTML = `
+          <td>${p.id}</td>
+
+          <td>
+            <img src="/uploads/${p.image || 'no-image.png'}"
+                 width="60" height="60"
+                 style="object-fit:cover; cursor:pointer"
+                 onclick="selectImage(${p.id})">
+
+            <input type="file" id="img-${p.id}" hidden onchange="uploadImage(${p.id})">
+          </td>
+
+          <td>
+            <input value="${p.name}" class="form-control" id="name-${p.id}" disabled>
+          </td>
+
+          <td>
+            <input value="${p.price}" class="form-control" id="price-${p.id}" disabled>
+          </td>
+
+          <td>
+            <select class="form-select" id="cat-${p.id}" disabled>
+              ${categories.map(c =>
+                `<option value="${c.id}" ${c.id == p.category_id ? 'selected' : ''}>${c.name}</option>`
+              ).join('')}
+            </select>
+          </td>
+
+          <td class="text-center">
+            <button class="btn btn-sm btn-warning mb-1" id="btn-${p.id}" onclick="toggleEdit(${p.id})">
+              Sửa
+            </button>
+
+            <button class="btn btn-sm btn-danger" onclick="deleteProduct(${p.id})">
+              Xóa
+            </button>
+          </td>
+        `;
+
+        table.appendChild(row);
       });
-
-      for (let category in group) {
-
-        const card = document.createElement('div');
-        card.className = 'card mb-4 shadow-sm';
-
-        const header = document.createElement('div');
-        header.className = 'card-header bg-dark text-white';
-        header.innerText = category;
-
-        const body = document.createElement('div');
-        body.className = 'card-body';
-
-        const row = document.createElement('div');
-        row.className = 'row';
-
-        group[category].forEach(p => {
-
-          const col = document.createElement('div');
-          col.className = 'col-md-4 mb-3';
-
-          col.innerHTML = `
-            <div class="card h-100">
-              <img src="/uploads/${p.image || 'no-image.png'}"
-                   class="card-img-top"
-                   style="height:150px; object-fit:cover">
-
-              <div class="card-body">
-                <h6 class="card-title">${p.name}</h6>
-                <p class="text-danger fw-bold">${p.price} VNĐ</p>
-              </div>
-
-              <div class="card-footer text-end">
-                <button class="btn btn-sm btn-danger" onclick="deleteProduct(${p.id})">
-                  Xóa
-                </button>
-              </div>
-            </div>
-          `;
-
-          row.appendChild(col);
-        });
-
-        body.appendChild(row);
-        card.appendChild(header);
-        card.appendChild(body);
-        container.appendChild(card);
-      }
     });
 }
 
@@ -147,8 +159,51 @@ function addProduct() {
   fetch('/api/products', {
     method: 'POST',
     body: formData
-  }).then(() => {
-    loadProducts();
+  }).then(() => loadProducts());
+}
+
+// ================= TOGGLE EDIT =================
+function toggleEdit(id) {
+  const name = document.getElementById('name-' + id);
+  const price = document.getElementById('price-' + id);
+  const cat = document.getElementById('cat-' + id);
+  const btn = document.getElementById('btn-' + id);
+
+  const isDisabled = name.disabled;
+
+  if (isDisabled) {
+    // bật sửa
+    name.disabled = false;
+    price.disabled = false;
+    cat.disabled = false;
+
+    btn.innerText = 'Xác nhận';
+    btn.classList.remove('btn-warning');
+    btn.classList.add('btn-success');
+  } else {
+    // xác nhận → update
+    updateProduct(id);
+
+    name.disabled = true;
+    price.disabled = true;
+    cat.disabled = true;
+
+    btn.innerText = 'Sửa';
+    btn.classList.remove('btn-success');
+    btn.classList.add('btn-warning');
+  }
+}
+
+// ================= UPDATE =================
+function updateProduct(id) {
+  const name = document.getElementById('name-' + id).value;
+  const price = document.getElementById('price-' + id).value;
+  const category_id = document.getElementById('cat-' + id).value;
+
+  fetch('/api/products/' + id, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name, price, category_id })
   });
 }
 
@@ -161,9 +216,26 @@ function deleteProduct(id) {
   }).then(() => loadProducts());
 }
 
+// ================= IMAGE =================
+function selectImage(id) {
+  document.getElementById('img-' + id).click();
+}
+
+function uploadImage(id) {
+  const file = document.getElementById('img-' + id).files[0];
+
+  const formData = new FormData();
+  formData.append('image', file);
+
+  fetch('/api/products/upload/' + id, {
+    method: 'PUT',
+    body: formData
+  }).then(() => loadProducts());
+}
+
 // INIT
 loadCategories();
-loadProducts();
+setTimeout(loadProducts, 300);
 
 </script>
 
