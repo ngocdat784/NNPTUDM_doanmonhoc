@@ -20,11 +20,10 @@
     <!-- RIGHT -->
     <div class="d-flex gap-2 align-items-center">
 
-      <!-- 🛒 CART ICON (CHỈ USER) -->
-      <div id="cart-icon" style="position: relative; cursor: pointer; display:none;">
+      <!-- 🛒 CART ICON -->
+      <div id="cart-icon" style="position: relative; cursor: pointer; display:none;" onclick="goToCart()">
         <i class="bi bi-cart" style="font-size: 24px;"></i>
 
-        <!-- Badge -->
         <span id="cart-count"
               style="
                 position:absolute;
@@ -47,6 +46,7 @@
         </a>
       </div>
 
+      <!-- AUTH -->
       <div id="auth-buttons">
         <a href="login.html" class="btn btn-primary">Đăng nhập</a>
         <a href="register.html" class="btn btn-success">Đăng ký</a>
@@ -60,24 +60,25 @@
   </div>
 
   <h1 class="text-center mb-4">PC Shop</h1>
+
   <!-- 🔍 SEARCH -->
-<div class="mb-4 position-relative">
+  <div class="mb-4 position-relative">
 
-  <input 
-    id="search-input"
-    type="text" 
-    class="form-control"
-    placeholder="Tìm sản phẩm hoặc danh mục..."
-    oninput="handleSearch()"
-  >
+    <input 
+      id="search-input"
+      type="text" 
+      class="form-control"
+      placeholder="Tìm sản phẩm hoặc danh mục..."
+      oninput="handleSearch()"
+    >
 
-  <!-- GỢI Ý -->
-  <div id="search-suggest"
-       class="list-group position-absolute w-100 shadow"
-       style="z-index:999; display:none;">
+    <!-- GỢI Ý -->
+    <div id="search-suggest"
+         class="list-group position-absolute w-100 shadow"
+         style="z-index:999; display:none;">
+    </div>
+
   </div>
-
-</div>
 
   <!-- ================= ADMIN VIEW ================= -->
   <div id="admin-view">
@@ -132,6 +133,9 @@
           </thead>
           <tbody id="product-table"></tbody>
         </table>
+
+        <div id="admin-pagination" class="mt-3 text-center"></div>
+
       </div>
     </div>
 
@@ -140,8 +144,10 @@
   <!-- ================= USER VIEW ================= -->
   <div id="user-view" style="display:none">
 
-    <!-- DANH SÁCH SẢN PHẨM -->
+    <!-- DANH SÁCH -->
     <div id="user-product-container"></div>
+
+    <div id="user-pagination" class="mt-3 text-center"></div>
 
   </div>
 
@@ -150,11 +156,21 @@
 <!-- Bootstrap Icons -->
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
 
+<script>
+function goToCart() {
+  window.location.href = 'cart.html';
+}
+</script>
+
 </body>
 <script>
 
 let categories = [];
 let allProducts = [];
+let currentPage = 1;
+
+const ADMIN_PAGE_SIZE = 5;
+const USER_PAGE_SIZE = 5;
 const rawToken = localStorage.getItem('token');
 const role = localStorage.getItem('role');
 const token = rawToken ? `Bearer ${rawToken}` : null;
@@ -274,63 +290,44 @@ function loadProducts() {
     .then(res => res.json())
     .then(data => {
 
-      // 🔥 LƯU DATA CHO SEARCH
+      // 🔥 LƯU DATA CHO SEARCH + PAGINATION
       allProducts = data;
 
-      // ===== ADMIN TABLE =====
+      // 🔥 RESET PAGE khi load mới
+      currentPage = 1;
+
+      // ===== RENDER THEO ROLE =====
       if (role === 'ADMIN') {
-        const table = document.getElementById('product-table');
-        table.innerHTML = '';
-
-        data.forEach(p => {
-          const row = document.createElement('tr');
-
-          row.innerHTML = `
-            <td>${p.id}</td>
-
-            <td>
-              <img src="/uploads/${p.image || 'no-image.png'}"
-                   width="60" height="60"
-                   style="object-fit:cover; cursor:pointer"
-                   onclick="selectImage(${p.id})">
-
-              <input type="file" id="img-${p.id}" hidden onchange="uploadImage(${p.id})">
-            </td>
-
-            <td><input value="${p.name}" class="form-control" id="name-${p.id}" disabled></td>
-            <td><input value="${p.price}" class="form-control" id="price-${p.id}" disabled></td>
-
-            <td>
-              <select class="form-select" id="cat-${p.id}" disabled>
-                ${categories.map(c =>
-                  `<option value="${c.id}" ${c.id == p.category_id ? 'selected' : ''}>${c.name}</option>`
-                ).join('')}
-              </select>
-            </td>
-
-            <td class="text-center">
-              <button class="btn btn-sm btn-warning mb-1" id="btn-${p.id}" onclick="toggleEdit(${p.id})">Sửa</button>
-              <button class="btn btn-sm btn-danger" onclick="deleteProduct(${p.id})">Xóa</button>
-            </td>
-          `;
-
-          table.appendChild(row);
-        });
-      }
-
-      // ===== USER CARD =====
-      else {
-        renderUserProducts(data);
+        renderAdminProducts(allProducts);
+      } else {
+        renderUserProducts(allProducts);
       }
     });
 }
 
-// ================= USER VIEW =================
 function renderUserProducts(products) {
   const container = document.getElementById('user-product-container');
   container.innerHTML = '';
 
-  categories.forEach(cat => {
+  // Lấy danh mục có sản phẩm
+  const categoryMap = {};
+
+  products.forEach(p => {
+    if (!categoryMap[p.category_id]) {
+      categoryMap[p.category_id] = {
+        name: p.category_name,
+        products: []
+      };
+    }
+    categoryMap[p.category_id].products.push(p);
+  });
+
+  const categoryList = Object.values(categoryMap);
+
+  const start = (currentPage - 1) * USER_PAGE_SIZE;
+  const paginatedCats = categoryList.slice(start, start + USER_PAGE_SIZE);
+
+  paginatedCats.forEach(cat => {
     const catDiv = document.createElement('div');
     catDiv.className = 'mb-4';
 
@@ -339,9 +336,7 @@ function renderUserProducts(products) {
     const row = document.createElement('div');
     row.className = 'row';
 
-    const filtered = products.filter(p => p.category_id == cat.id);
-
-    filtered.forEach(p => {
+    cat.products.forEach(p => {
       const col = document.createElement('div');
       col.className = 'col-md-3 mb-3';
 
@@ -354,8 +349,8 @@ function renderUserProducts(products) {
             <p class="text-danger fw-bold">${p.price} VND</p>
 
             <button class="btn btn-success w-100" onclick="addToCart(${p.id})">
-  Thêm vào giỏ
-</button>
+              Thêm vào giỏ
+            </button>
           </div>
         </div>
       `;
@@ -366,8 +361,123 @@ function renderUserProducts(products) {
     catDiv.appendChild(row);
     container.appendChild(catDiv);
   });
+
+  renderPagination(categoryList.length, USER_PAGE_SIZE, 'user');
+}
+function renderAdminProducts(products) {
+  const table = document.getElementById('product-table');
+  table.innerHTML = '';
+
+  // ===== FIX: tránh lỗi page vượt quá =====
+  const totalPages = Math.ceil(products.length / ADMIN_PAGE_SIZE);
+  if (currentPage > totalPages) currentPage = totalPages || 1;
+
+  // ===== PAGINATION =====
+  const start = (currentPage - 1) * ADMIN_PAGE_SIZE;
+  const paginated = products.slice(start, start + ADMIN_PAGE_SIZE);
+
+  // ===== RENDER (GIỮ NGUYÊN 100% UI CŨ) =====
+  paginated.forEach(p => {
+    const row = document.createElement('tr');
+
+    row.innerHTML = `
+      <td>${p.id}</td>
+
+      <td>
+        <img src="/uploads/${p.image || 'no-image.png'}"
+             width="60" height="60"
+             style="object-fit:cover; cursor:pointer"
+             onclick="selectImage(${p.id})">
+
+        <input type="file" id="img-${p.id}" hidden onchange="uploadImage(${p.id})">
+      </td>
+
+      <td><input value="${p.name}" class="form-control" id="name-${p.id}" disabled></td>
+      <td><input value="${p.price}" class="form-control" id="price-${p.id}" disabled></td>
+
+      <td>
+        <select class="form-select" id="cat-${p.id}" disabled>
+          ${categories.map(c =>
+            `<option value="${c.id}" ${c.id == p.category_id ? 'selected' : ''}>${c.name}</option>`
+          ).join('')}
+        </select>
+      </td>
+
+      <td class="text-center">
+        <button class="btn btn-sm btn-warning mb-1" id="btn-${p.id}" onclick="toggleEdit(${p.id})">Sửa</button>
+        <button class="btn btn-sm btn-danger" onclick="deleteProduct(${p.id})">Xóa</button>
+      </td>
+    `;
+
+    table.appendChild(row);
+  });
+
+  // ===== PAGINATION UI =====
+  renderPagination(products.length, ADMIN_PAGE_SIZE, 'admin');
+}
+function renderPagination(totalItems, pageSize, type) {
+  const totalPages = Math.ceil(totalItems / pageSize);
+
+  // 🔥 TÁCH RIÊNG CHO ADMIN / USER
+  const containerId = type === 'admin' ? 'admin-pagination' : 'user-pagination';
+  const container = document.getElementById(containerId);
+
+  if (!container) return;
+
+  container.innerHTML = '';
+
+  // ===== PREV =====
+  const prevBtn = document.createElement('button');
+  prevBtn.className = 'btn btn-sm btn-outline-secondary mx-1';
+  prevBtn.innerText = '«';
+  prevBtn.disabled = currentPage === 1;
+
+  prevBtn.onclick = () => {
+    currentPage--;
+    rerender(type);
+  };
+
+  container.appendChild(prevBtn);
+
+  // ===== PAGE NUMBER =====
+  for (let i = 1; i <= totalPages; i++) {
+    const btn = document.createElement('button');
+
+    btn.className = 'btn btn-sm mx-1 ' +
+      (i === currentPage ? 'btn-primary' : 'btn-outline-primary');
+
+    btn.innerText = i;
+
+    btn.onclick = () => {
+      currentPage = i;
+      rerender(type);
+    };
+
+    container.appendChild(btn);
+  }
+
+  // ===== NEXT =====
+  const nextBtn = document.createElement('button');
+  nextBtn.className = 'btn btn-sm btn-outline-secondary mx-1';
+  nextBtn.innerText = '»';
+  nextBtn.disabled = currentPage === totalPages;
+
+  nextBtn.onclick = () => {
+    currentPage++;
+    rerender(type);
+  };
+
+  container.appendChild(nextBtn);
 }
 
+// 🔥 TÁCH HÀM RENDER LẠI
+function rerender(type) {
+  if (type === 'admin') {
+    renderAdminProducts(allProducts);
+  } else {
+    renderUserProducts(allProducts);
+  }
+}
 // ================= CART =================
 
 async function loadCart() {
@@ -611,10 +721,23 @@ function handleSearch() {
   const keyword = document.getElementById('search-input').value.toLowerCase();
   const suggestBox = document.getElementById('search-suggest');
 
+  // 🔥 RESET PAGE KHI SEARCH
+  currentPage = 1;
+
   // ===== EMPTY → TRẢ LẠI GIAO DIỆN =====
   if (!keyword) {
     suggestBox.style.display = 'none';
-    loadProducts();
+
+    // ❌ Không nên gọi lại API
+    // loadProducts();
+
+    // ✅ Render lại từ data đã có
+    if (role === 'ADMIN') {
+      renderAdminProducts(allProducts);
+    } else {
+      renderUserProducts(allProducts);
+    }
+
     return;
   }
 
@@ -624,8 +747,12 @@ function handleSearch() {
     (p.category_name && p.category_name.toLowerCase().includes(keyword))
   );
 
-  // ===== RENDER PRODUCT =====
-  renderUserProducts(filtered);
+  // ===== RENDER PRODUCT THEO ROLE =====
+  if (role === 'ADMIN') {
+    renderAdminProducts(filtered);
+  } else {
+    renderUserProducts(filtered);
+  }
 
   // ===== GỢI Ý =====
   suggestBox.innerHTML = '';
@@ -641,7 +768,14 @@ function handleSearch() {
     item.onclick = () => {
       document.getElementById('search-input').value = p.name;
       suggestBox.style.display = 'none';
-      renderUserProducts([p]);
+
+      currentPage = 1; // 🔥 reset lại khi click gợi ý
+
+      if (role === 'ADMIN') {
+        renderAdminProducts([p]);
+      } else {
+        renderUserProducts([p]);
+      }
     };
 
     suggestBox.appendChild(item);

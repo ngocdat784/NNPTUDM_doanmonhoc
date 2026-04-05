@@ -532,6 +532,7 @@ app.get('/api/orders/:id', verifyToken, async (req, res) => {
     res.status(500).send("Lỗi server");
   }
 });
+
 app.listen(PORT, () => {
   console.log(`Server chạy tại http://localhost:${PORT}`);
 
