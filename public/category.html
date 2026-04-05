@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Category Manager</title>
+
+  <!-- Bootstrap -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+
+<body class="bg-light">
+
+<div class="container mt-5">
+
+  <h1 class="text-center mb-4">Quản lý danh mục</h1>
+
+  <!-- NÚT QUAY LẠI -->
+  <div class="mb-3 text-end">
+    <a href="index.html" class="btn btn-secondary">← Quay lại sản phẩm</a>
+  </div>
+
+  <!-- FORM -->
+  <div class="card shadow p-4 mb-4">
+    <h4 class="mb-3">Thêm danh mục</h4>
+
+    <div class="row g-2">
+      <div class="col-md-10">
+        <input id="name" class="form-control" placeholder="Tên danh mục (VD: CPU, GPU, RAM...)">
+      </div>
+
+      <div class="col-md-2">
+        <button class="btn btn-primary w-100" onclick="addCategory()">+</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- TABLE -->
+  <div class="card shadow">
+    <div class="card-body">
+
+      <table class="table table-bordered table-hover align-middle">
+        <thead class="table-dark text-center">
+          <tr>
+            <th>ID</th>
+            <th>Tên danh mục</th>
+            <th>Hành động</th>
+          </tr>
+        </thead>
+        <tbody id="category-table"></tbody>
+      </table>
+
+    </div>
+  </div>
+
+</div>
+
+<script>
+
+// ================= LOAD =================
+function loadCategories() {
+  fetch('/api/categories')
+    .then(res => res.json())
+    .then(data => {
+
+      const table = document.getElementById('category-table');
+      table.innerHTML = '';
+
+      data.forEach(c => {
+
+        const row = document.createElement('tr');
+
+        row.innerHTML = `
+          <td>${c.id}</td>
+
+          <td>
+            <input value="${c.name}" class="form-control" id="name-${c.id}" disabled>
+          </td>
+
+          <td class="text-center">
+            <button class="btn btn-sm btn-warning mb-1" id="btn-${c.id}" onclick="toggleEdit(${c.id})">
+              Sửa
+            </button>
+
+            <button class="btn btn-sm btn-danger" onclick="deleteCategory(${c.id})">
+              Xóa
+            </button>
+          </td>
+        `;
+
+        table.appendChild(row);
+      });
+    });
+}
+
+// ================= ADD =================
+function addCategory() {
+  const name = document.getElementById('name').value;
+
+  fetch('/api/categories', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name })
+  }).then(() => {
+    document.getElementById('name').value = '';
+    loadCategories();
+  });
+}
+
+// ================= TOGGLE EDIT =================
+function toggleEdit(id) {
+  const input = document.getElementById('name-' + id);
+  const btn = document.getElementById('btn-' + id);
+
+  const isDisabled = input.disabled;
+
+  if (isDisabled) {
+    input.disabled = false;
+
+    btn.innerText = 'Xác nhận';
+    btn.classList.remove('btn-warning');
+    btn.classList.add('btn-success');
+  } else {
+    updateCategory(id);
+
+    input.disabled = true;
+
+    btn.innerText = 'Sửa';
+    btn.classList.remove('btn-success');
+    btn.classList.add('btn-warning');
+  }
+}
+
+// ================= UPDATE =================
+function updateCategory(id) {
+  const name = document.getElementById('name-' + id).value;
+
+  fetch('/api/categories/' + id, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name })
+  });
+}
+
+// ================= DELETE =================
+function deleteCategory(id) {
+  if (!confirm("Xóa danh mục?")) return;
+
+  fetch('/api/categories/' + id, {
+    method: 'DELETE'
+  }).then(() => loadCategories());
+}
+
+// INIT
+loadCategories();
+
+</script>
+
+</body>
+</html>

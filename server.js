@@ -5,7 +5,7 @@ const PORT = 3000;
 const db = require('./db');
 const multer = require('multer');
 
-// cấu hình nơi lưu file
+// ================= UPLOAD =================
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
     cb(null, 'public/uploads/');
@@ -32,7 +32,7 @@ app.get('/api/categories', (req, res) => {
   });
 });
 
-// POST category
+// ADD category
 app.post('/api/categories', (req, res) => {
   const { name } = req.body;
 
@@ -46,7 +46,7 @@ app.post('/api/categories', (req, res) => {
   );
 });
 
-// PUT category
+// UPDATE category
 app.put('/api/categories/:id', (req, res) => {
   const { id } = req.params;
   const { name } = req.body;
@@ -78,20 +78,7 @@ app.delete('/api/categories/:id', (req, res) => {
 
 // ====================== PRODUCT ======================
 
-// GET all products (kèm category)
-app.get('/api/products', (req, res) => {
-  const sql = `
-    SELECT p.id, p.name, p.price, p.category_id, c.name AS category_name
-    FROM products p
-    LEFT JOIN categories c ON p.category_id = c.id
-  `;
-
-  db.query(sql, (err, result) => {
-    if (err) return res.status(500).send(err);
-    res.json(result);
-  });
-});
-
+// GET products (JOIN category)
 app.get('/api/products', (req, res) => {
   const sql = `
     SELECT p.*, c.name AS category_name
@@ -105,6 +92,7 @@ app.get('/api/products', (req, res) => {
   });
 });
 
+// ADD product + image
 app.post('/api/products', upload.single('image'), (req, res) => {
   const { name, price, category_id } = req.body;
   const image = req.file ? req.file.filename : null;
@@ -114,12 +102,12 @@ app.post('/api/products', upload.single('image'), (req, res) => {
     [name, price, category_id, image],
     (err) => {
       if (err) return res.status(500).send(err);
-      res.send('Thêm sản phẩm + ảnh thành công');
+      res.send('Thêm sản phẩm thành công');
     }
   );
 });
 
-// PUT product
+// UPDATE product info
 app.put('/api/products/:id', (req, res) => {
   const { id } = req.params;
   const { name, price, category_id } = req.body;
@@ -130,6 +118,21 @@ app.put('/api/products/:id', (req, res) => {
     (err) => {
       if (err) return res.status(500).send(err);
       res.send('Cập nhật sản phẩm thành công');
+    }
+  );
+});
+
+// UPLOAD IMAGE riêng
+app.put('/api/products/upload/:id', upload.single('image'), (req, res) => {
+  const { id } = req.params;
+  const image = req.file.filename;
+
+  db.query(
+    'UPDATE products SET image = ? WHERE id = ?',
+    [image, id],
+    (err) => {
+      if (err) return res.status(500).send(err);
+      res.send('Upload ảnh thành công');
     }
   );
 });
@@ -149,6 +152,7 @@ app.delete('/api/products/:id', (req, res) => {
 });
 
 
+// ================= START SERVER =================
 app.listen(PORT, () => {
   console.log(`Server chạy tại http://localhost:${PORT}`);
 });
