@@ -33,7 +33,14 @@ function verifyToken(req, res, next) {
     next();
   });
 }
-
+function query(sql, params = []) {
+  return new Promise((resolve, reject) => {
+    db.query(sql, params, (err, result) => {
+      if (err) reject(err);
+      else resolve(result);
+    });
+  });
+}
 function isAdmin(req, res, next) {
   if (req.user.role !== 'ADMIN') {
     return res.status(403).send('Không có quyền ADMIN');
@@ -60,6 +67,23 @@ async function createAdminIfNotExists() {
       console.log("Admin đã tồn tại");
     }
   });
+}
+async function getCart(userId) {
+  const rows = await query(
+    'SELECT * FROM cart WHERE user_id = ?',
+    [userId]
+  );
+
+  if (rows.length === 0) {
+    const result = await query(
+      'INSERT INTO cart(user_id) VALUES (?)',
+      [userId]
+    );
+
+    return result.insertId;
+  }
+
+  return rows[0].id;
 }
 // ================= UPLOAD =================
 const storage = multer.diskStorage({
@@ -257,7 +281,111 @@ app.delete('/api/products/:id', verifyToken, isAdmin, (req, res) => {
     }
   );
 });
+app.post('/api/cart/add', verifyToken, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { product_id } = req.body;
 
+    const cartId = await getCart(userId);
+
+    const items = await query(
+      'SELECT * FROM cart_items WHERE cart_id=? AND product_id=?',
+      [cartId, product_id]
+    );
+
+    if (items.length > 0) {
+      await query(
+        'UPDATE cart_items SET quantity = quantity + 1 WHERE id=?',
+        [items[0].id]
+      );
+    } else {
+      await query(
+        'INSERT INTO cart_items(cart_id, product_id, quantity) VALUES (?, ?, 1)',
+        [cartId, product_id]
+      );
+    }
+
+    res.send("OK");
+  } catch (err) {
+    console.error(err);
+    res.status(500).send("Lỗi server");
+  }
+});
+app.get('/api/cart', verifyToken, async (req, res) => {
+  try {
+    const cartId = await getCart(req.user.id);
+
+    const data = await query(`
+      SELECT 
+        ci.id,
+        ci.product_id,
+        ci.quantity,
+        p.name,
+        p.price,
+        p.image
+      FROM cart_items ci
+      JOIN products p ON ci.product_id = p.id
+      WHERE ci.cart_id = ?
+    `, [cartId]);
+
+    res.json(data);
+  } catch (err) {
+    console.error(err);
+    res.status(500).send("Lỗi server");
+  }
+});
+app.put('/api/cart/:id', verifyToken, async (req, res) => {
+  try {
+    const { type } = req.body;
+
+    if (type === 'increase') {
+      await query(
+        'UPDATE cart_items SET quantity = quantity + 1 WHERE id=?',
+        [req.params.id]
+      );
+    }
+
+    if (type === 'decrease') {
+      await query(
+        'UPDATE cart_items SET quantity = quantity - 1 WHERE id=? AND quantity > 1',
+        [req.params.id]
+      );
+    }
+
+    res.send("OK");
+  } catch (err) {
+    console.error(err);
+    res.status(500).send("Lỗi server");
+  }
+});
+app.delete('/api/cart/:id', verifyToken, async (req, res) => {
+  try {
+    await query(
+      'DELETE FROM cart_items WHERE id=?',
+      [req.params.id]
+    );
+
+    res.send("Deleted");
+  } catch (err) {
+    console.error(err);
+    res.status(500).send("Lỗi server");
+  }
+});
+app.delete('/api/cart/clear', verifyToken, async (req, res) => {
+  try {
+    const cartId = await getCart(req.user.id);
+
+    await query(
+      'DELETE FROM cart_items WHERE cart_id=?',
+      [cartId]
+    );
+
+    res.send("Cleared");
+  } catch (err) {
+    console.error(err);
+    res.status(500).send("Lỗi server");
+  }
+});
 app.listen(PORT, () => {
   console.log(`Server chạy tại http://localhost:${PORT}`);
 

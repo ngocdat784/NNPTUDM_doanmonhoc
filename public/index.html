@@ -20,6 +20,26 @@
     <!-- RIGHT -->
     <div class="d-flex gap-2 align-items-center">
 
+      <!-- 🛒 CART ICON (CHỈ USER) -->
+      <div id="cart-icon" style="position: relative; cursor: pointer; display:none;">
+        <i class="bi bi-cart" style="font-size: 24px;"></i>
+
+        <!-- Badge -->
+        <span id="cart-count"
+              style="
+                position:absolute;
+                top:-8px;
+                right:-10px;
+                background:red;
+                color:white;
+                border-radius:50%;
+                padding:2px 6px;
+                font-size:12px;
+              ">
+          0
+        </span>
+      </div>
+
       <div id="auth-buttons">
         <a href="login.html" class="btn btn-primary">Đăng nhập</a>
         <a href="register.html" class="btn btn-success">Đăng ký</a>
@@ -95,12 +115,19 @@
   <!-- ================= USER VIEW ================= -->
   <div id="user-view" style="display:none">
 
-    <!-- DANH SÁCH SẢN PHẨM THEO DANH MỤC -->
+    <!-- DANH SÁCH SẢN PHẨM -->
     <div id="user-product-container"></div>
+
+    
 
   </div>
 
 </div>
+
+<!-- Bootstrap Icons (QUAN TRỌNG để hiện icon giỏ) -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
+
+</body>
 
 <script>
 
@@ -115,6 +142,7 @@ function initAuthUI() {
   const userInfo = document.getElementById('user-info');
   const authButtons = document.getElementById('auth-buttons');
   const logoutBtn = document.getElementById('logout-btn');
+  const cartIcon = document.getElementById('cart-icon');
 
   const adminView = document.getElementById('admin-view');
   const userView = document.getElementById('user-view');
@@ -154,6 +182,11 @@ function initAuthUI() {
     adminView.style.display = 'none';
     userView.style.display = 'block';
   }
+  if (role === 'ADMIN') {
+  if (cartIcon) cartIcon.style.display = 'none';
+} else {
+  if (cartIcon) cartIcon.style.display = 'block';
+}
 }
 
 // ================= ERROR =================
@@ -280,8 +313,8 @@ function renderUserProducts(products) {
             <p class="text-danger fw-bold">${p.price} VND</p>
 
             <button class="btn btn-success w-100" onclick="addToCart(${p.id})">
-              Thêm vào giỏ
-            </button>
+  Thêm vào giỏ
+</button>
           </div>
         </div>
       `;
@@ -294,9 +327,138 @@ function renderUserProducts(products) {
   });
 }
 
-// ================= CART (demo) =================
-function addToCart(id) {
-  alert("Đã thêm sản phẩm ID " + id + " vào giỏ");
+// ================= CART =================
+
+async function loadCart() {
+  const res = await apiFetch('/api/cart');
+
+  if (!res) return;
+
+  const data = await res.json();
+  renderCart(data);
+}
+
+function renderCart(items) {
+  const container = document.getElementById('cart-container');
+  if (!container) return; // 🔥 QUAN TRỌNG
+
+  container.innerHTML = '';
+
+  if (!items || items.length === 0) {
+    container.innerHTML = "<p>Giỏ hàng trống</p>";
+    return;
+  }
+
+  let total = 0;
+
+  items.forEach(item => {
+    total += item.price * item.quantity;
+
+    const div = document.createElement('div');
+    div.className = 'd-flex justify-content-between align-items-center border p-2 mb-2';
+
+    div.innerHTML = `
+      <div>
+        <b>${item.name}</b><br>
+        ${item.price} VND
+      </div>
+
+      <div class="d-flex align-items-center gap-2">
+
+        ${item.quantity > 1 ? `
+          <button class="btn btn-sm btn-secondary"
+                  onclick="decreaseQty(${item.id})">-</button>
+        ` : ''}
+
+        <span class="fw-bold">${item.quantity}</span>
+
+        <button class="btn btn-sm btn-primary"
+                onclick="increaseQty(${item.id})">+</button>
+
+        <button class="btn btn-sm btn-danger"
+                onclick="removeItem(${item.id})">X</button>
+      </div>
+    `;
+
+    container.appendChild(div);
+  });
+
+  const totalDiv = document.createElement('div');
+  totalDiv.className = 'mt-3 fw-bold text-end';
+  totalDiv.innerHTML = `Tổng tiền: <span class="text-danger">${total} VND</span>`;
+  container.appendChild(totalDiv);
+
+  const clearBtn = document.createElement('button');
+  clearBtn.className = 'btn btn-danger mt-2';
+  clearBtn.innerText = 'Xóa toàn bộ giỏ';
+  clearBtn.onclick = clearCart;
+
+  container.appendChild(clearBtn);
+}
+async function addToCart(id) {
+  const res = await apiFetch('/api/cart/add', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ product_id: id })
+  });
+
+  if (!res) return;
+
+  console.log("Đã thêm sản phẩm");
+
+  await updateCartCount(); // 🔥 chỉ update badge
+}
+
+async function increaseQty(id) {
+  const res = await apiFetch('/api/cart/' + id, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ type: 'increase' })
+  });
+
+  if (!res) return;
+
+  loadCart();
+}
+
+async function decreaseQty(id) {
+  const res = await apiFetch('/api/cart/' + id, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ type: 'decrease' })
+  });
+
+  if (!res) return;
+
+  loadCart();
+}
+
+async function removeItem(id) {
+  const res = await apiFetch('/api/cart/' + id, {
+    method: 'DELETE'
+  });
+
+  if (!res) return;
+
+  loadCart();
+}
+
+async function clearCart() {
+  if (!confirm("Xóa toàn bộ giỏ hàng?")) return;
+
+  const res = await apiFetch('/api/cart/clear', {
+    method: 'DELETE'
+  });
+
+  if (!res) return;
+
+  loadCart();
 }
 
 // ================= ADMIN ACTION =================
@@ -330,7 +492,19 @@ function updateProduct(id) {
     })
   });
 }
+async function updateCartCount() {
+  const res = await apiFetch('/api/cart');
+  if (!res) return;
 
+  const items = await res.json();
+
+  const cartCount = document.getElementById('cart-count');
+
+  if (cartCount) {
+    const totalItems = items.reduce((sum, i) => sum + i.quantity, 0);
+    cartCount.innerText = totalItems;
+  }
+}
 function deleteProduct(id) {
   if (!confirm("Xóa sản phẩm?")) return;
 
@@ -356,7 +530,19 @@ function uploadImage(id) {
     body: formData
   }).then(() => loadProducts());
 }
+async function apiFetch(url, options = {}) {
+  const res = await fetch(url, {
+    ...options,
+    headers: {
+      ...(options.headers || {}),
+      Authorization: token
+    }
+  });
 
+  if (handleAuthError(res)) return null;
+
+  return res;
+}
 function toggleEdit(id) {
   const name = document.getElementById('name-' + id);
   const price = document.getElementById('price-' + id);
@@ -380,12 +566,17 @@ function toggleEdit(id) {
     btn.classList.replace('btn-success', 'btn-warning');
   }
 }
-
-// ================= INIT =================
+document.getElementById('cart-icon')?.addEventListener('click', () => {
+  window.location.href = 'cart.html';
+});
 document.addEventListener("DOMContentLoaded", () => {
   initAuthUI();
   loadCategories();
   loadProducts();
+
+  if (rawToken && role !== 'ADMIN') {
+    updateCartCount(); // ✅ thay vì loadCart()
+  }
 });
 
 </script>

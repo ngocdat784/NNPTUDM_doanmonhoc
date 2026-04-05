@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <title>Giỏ hàng</title>
+
+  <!-- Bootstrap -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+
+</head>
+
+<body class="bg-light">
+
+<div class="container mt-4">
+
+  <!-- HEADER -->
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <h3>Giỏ hàng của bạn</h3>
+
+    <button class="btn btn-secondary" onclick="goHome()">
+      ← Trang chủ
+    </button>
+  </div>
+
+  <!-- CART -->
+  <div id="cart-container"></div>
+
+</div>
+
+<script>
+const rawToken = localStorage.getItem('token');
+const token = rawToken ? `Bearer ${rawToken}` : null;
+
+// ================= ERROR =================
+function handleAuthError(res) {
+  if (res.status === 401 || res.status === 403) {
+    alert("Hết phiên, vui lòng đăng nhập lại");
+    localStorage.clear();
+    window.location.href = 'login.html';
+    return true;
+  }
+  return false;
+}
+
+// ================= API HELPER =================
+async function apiFetch(url, options = {}) {
+  const res = await fetch(url, {
+    ...options,
+    headers: {
+      ...(options.headers || {}),
+      Authorization: token
+    }
+  });
+
+  if (handleAuthError(res)) return null;
+
+  return res;
+}
+
+// ================= LOAD CART =================
+async function loadCart() {
+  const res = await apiFetch('/api/cart');
+  if (!res) return;
+
+  const data = await res.json();
+  renderCart(data);
+}
+
+// ================= RENDER =================
+function renderCart(items) {
+  const container = document.getElementById('cart-container');
+  container.innerHTML = '';
+
+  // ===== EMPTY =====
+  if (!items || items.length === 0) {
+    container.innerHTML = "<p>Giỏ hàng trống</p>";
+    return;
+  }
+
+  let total = 0;
+
+  items.forEach(item => {
+    total += item.price * item.quantity;
+
+    const div = document.createElement('div');
+    div.className = 'd-flex justify-content-between align-items-center border p-3 mb-2 bg-white shadow-sm';
+
+    div.innerHTML = `
+      <div>
+        <b>${item.name}</b><br>
+        <span class="text-danger">${item.price} VND</span>
+      </div>
+
+      <div class="d-flex align-items-center gap-2">
+
+        ${item.quantity > 1 ? `
+          <button class="btn btn-sm btn-secondary"
+                  onclick="decreaseQty(${item.id})">-</button>
+        ` : ''}
+
+        <span class="fw-bold">${item.quantity}</span>
+
+        <button class="btn btn-sm btn-primary"
+                onclick="increaseQty(${item.id})">+</button>
+
+        <button class="btn btn-sm btn-danger"
+                onclick="removeItem(${item.id})">X</button>
+      </div>
+    `;
+
+    container.appendChild(div);
+  });
+
+  // ===== TOTAL =====
+  const totalDiv = document.createElement('div');
+  totalDiv.className = 'mt-3 text-end fw-bold fs-5';
+  totalDiv.innerHTML = `Tổng tiền: <span class="text-danger">${total} VND</span>`;
+  container.appendChild(totalDiv);
+
+  // ===== ACTIONS =====
+  const actionDiv = document.createElement('div');
+  actionDiv.className = 'mt-3 d-flex justify-content-between';
+
+  actionDiv.innerHTML = `
+    <button class="btn btn-danger" onclick="clearCart()">Xóa toàn bộ</button>
+    <button class="btn btn-success" onclick="checkout()">Thanh toán</button>
+  `;
+
+  container.appendChild(actionDiv);
+}
+
+// ================= ACTION =================
+async function increaseQty(id) {
+  const res = await apiFetch('/api/cart/' + id, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ type: 'increase' })
+  });
+
+  if (!res) return;
+
+  loadCart();
+}
+
+async function decreaseQty(id) {
+  const res = await apiFetch('/api/cart/' + id, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ type: 'decrease' })
+  });
+
+  if (!res) return;
+
+  loadCart();
+}
+
+async function removeItem(id) {
+  const res = await apiFetch('/api/cart/' + id, {
+    method: 'DELETE'
+  });
+
+  if (!res) return;
+
+  loadCart();
+}
+
+async function clearCart() {
+  if (!confirm("Xóa toàn bộ giỏ hàng?")) return;
+
+  const res = await apiFetch('/api/cart/clear', {
+    method: 'DELETE'
+  });
+
+  if (!res) return;
+
+  loadCart();
+}
+
+// ================= CHECKOUT (FAKE) =================
+function checkout() {
+  alert("Thanh toán thành công (demo)");
+}
+
+// ================= NAV =================
+function goHome() {
+  window.location.href = 'index.html';
+}
+
+// ================= INIT =================
+document.addEventListener("DOMContentLoaded", () => {
+  if (!rawToken) {
+    alert("Vui lòng đăng nhập");
+    window.location.href = 'login.html';
+    return;
+  }
+
+  loadCart();
+});
+</script>
+
+</body>
+</html>
