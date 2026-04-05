@@ -288,6 +288,7 @@ app.post('/api/cart/add', verifyToken, async (req, res) => {
 
     const cartId = await getCart(userId);
 
+    // ===== CART LOGIC =====
     const items = await query(
       'SELECT * FROM cart_items WHERE cart_id=? AND product_id=?',
       [cartId, product_id]
@@ -302,6 +303,24 @@ app.post('/api/cart/add', verifyToken, async (req, res) => {
       await query(
         'INSERT INTO cart_items(cart_id, product_id, quantity) VALUES (?, ?, 1)',
         [cartId, product_id]
+      );
+    }
+
+    // ===== 🔥 TRACK VIEW (QUAN TRỌNG) =====
+    const existing = await query(
+      'SELECT * FROM user_product_views WHERE user_id=? AND product_id=?',
+      [userId, product_id]
+    );
+
+    if (existing.length > 0) {
+      await query(
+        'UPDATE user_product_views SET view_count = view_count + 1 WHERE user_id=? AND product_id=?',
+        [userId, product_id]
+      );
+    } else {
+      await query(
+        'INSERT INTO user_product_views (user_id, product_id, view_count) VALUES (?, ?, 1)',
+        [userId, product_id]
       );
     }
 
@@ -527,6 +546,44 @@ app.get('/api/orders/:id', verifyToken, async (req, res) => {
 
     res.json(order[0]);
 
+  } catch (err) {
+    console.error(err);
+    res.status(500).send("Lỗi server");
+  }
+});
+app.get('/api/products/top', async (req, res) => {
+  try {
+    const data = await query(`
+      SELECT 
+        p.*, 
+        SUM(upv.view_count) as total_views
+      FROM user_product_views upv
+      JOIN products p ON upv.product_id = p.id
+      GROUP BY upv.product_id
+      ORDER BY total_views DESC
+      LIMIT 5
+    `);
+
+    res.json(data);
+  } catch (err) {
+    console.error(err);
+    res.status(500).send("Lỗi server");
+  }
+});
+app.get('/api/products/recommend', verifyToken, async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    const data = await query(`
+      SELECT p.*, upv.view_count
+      FROM user_product_views upv
+      JOIN products p ON upv.product_id = p.id
+      WHERE upv.user_id = ?
+      ORDER BY upv.view_count DESC
+      LIMIT 5
+    `, [userId]);
+
+    res.json(data);
   } catch (err) {
     console.error(err);
     res.status(500).send("Lỗi server");
