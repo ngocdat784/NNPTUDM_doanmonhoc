@@ -358,19 +358,6 @@ app.put('/api/cart/:id', verifyToken, async (req, res) => {
     res.status(500).send("Lỗi server");
   }
 });
-app.delete('/api/cart/:id', verifyToken, async (req, res) => {
-  try {
-    await query(
-      'DELETE FROM cart_items WHERE id=?',
-      [req.params.id]
-    );
-
-    res.send("Deleted");
-  } catch (err) {
-    console.error(err);
-    res.status(500).send("Lỗi server");
-  }
-});
 app.delete('/api/cart/clear', verifyToken, async (req, res) => {
   try {
     const cartId = await getCart(req.user.id);
@@ -386,6 +373,20 @@ app.delete('/api/cart/clear', verifyToken, async (req, res) => {
     res.status(500).send("Lỗi server");
   }
 });
+app.delete('/api/cart/:id', verifyToken, async (req, res) => {
+  try {
+    await query(
+      'DELETE FROM cart_items WHERE id=?',
+      [req.params.id]
+    );
+
+    res.send("Deleted");
+  } catch (err) {
+    console.error(err);
+    res.status(500).send("Lỗi server");
+  }
+});
+
 app.listen(PORT, () => {
   console.log(`Server chạy tại http://localhost:${PORT}`);
 
