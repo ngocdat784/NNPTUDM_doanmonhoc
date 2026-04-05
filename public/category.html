@@ -55,11 +55,60 @@
 
 <script>
 
+const rawToken = localStorage.getItem('token');
+const role = localStorage.getItem('role');
+const token = rawToken ? `Bearer ${rawToken}` : null;
+
+// ================= AUTH CHECK =================
+function checkAdmin() {
+  if (!rawToken) {
+    alert("Bạn chưa đăng nhập");
+    window.location.href = "login.html";
+    return false;
+  }
+
+  try {
+    const payload = JSON.parse(atob(rawToken.split('.')[1]));
+
+    if (role !== 'ADMIN') {
+      alert("Bạn không có quyền ADMIN");
+      window.location.href = "index.html";
+      return false;
+    }
+
+    return true;
+
+  } catch (e) {
+    localStorage.clear();
+    window.location.href = "login.html";
+    return false;
+  }
+}
+
+// ================= ERROR =================
+function handleAuthError(res) {
+  if (res.status === 401 || res.status === 403) {
+    alert("Không có quyền hoặc hết phiên");
+    localStorage.clear();
+    window.location.href = "login.html";
+    return true;
+  }
+  return false;
+}
+
 // ================= LOAD =================
 function loadCategories() {
-  fetch('/api/categories')
-    .then(res => res.json())
+  fetch('/api/categories', {
+    headers: {
+      Authorization: token
+    }
+  })
+    .then(res => {
+      if (handleAuthError(res)) return;
+      return res.json();
+    })
     .then(data => {
+      if (!data) return;
 
       const table = document.getElementById('category-table');
       table.innerHTML = '';
@@ -93,15 +142,24 @@ function loadCategories() {
 
 // ================= ADD =================
 function addCategory() {
+  if (role !== 'ADMIN') return alert("Không có quyền");
+
   const name = document.getElementById('name').value;
 
   fetch('/api/categories', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: token
+    },
     body: JSON.stringify({ name })
-  }).then(() => {
-    document.getElementById('name').value = '';
-    loadCategories();
+  })
+  .then(res => {
+    if (handleAuthError(res)) return;
+    if (res.ok) {
+      document.getElementById('name').value = '';
+      loadCategories();
+    }
   });
 }
 
@@ -116,27 +174,32 @@ function toggleEdit(id) {
     input.disabled = false;
 
     btn.innerText = 'Xác nhận';
-    btn.classList.remove('btn-warning');
-    btn.classList.add('btn-success');
+    btn.classList.replace('btn-warning', 'btn-success');
   } else {
     updateCategory(id);
 
     input.disabled = true;
 
     btn.innerText = 'Sửa';
-    btn.classList.remove('btn-success');
-    btn.classList.add('btn-warning');
+    btn.classList.replace('btn-success', 'btn-warning');
   }
 }
 
 // ================= UPDATE =================
 function updateCategory(id) {
-  const name = document.getElementById('name-' + id).value;
-
   fetch('/api/categories/' + id, {
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ name })
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: token
+    },
+    body: JSON.stringify({
+      name: document.getElementById('name-' + id).value
+    })
+  })
+  .then(res => {
+    if (handleAuthError(res)) return;
+    if (res.ok) alert("Cập nhật thành công");
   });
 }
 
@@ -145,12 +208,26 @@ function deleteCategory(id) {
   if (!confirm("Xóa danh mục?")) return;
 
   fetch('/api/categories/' + id, {
-    method: 'DELETE'
-  }).then(() => loadCategories());
+    method: 'DELETE',
+    headers: {
+      Authorization: token
+    }
+  })
+  .then(res => {
+    if (handleAuthError(res)) return;
+    if (res.ok) {
+      alert("Đã xóa");
+      loadCategories();
+    }
+  });
 }
 
-// INIT
-loadCategories();
+// ================= INIT =================
+document.addEventListener("DOMContentLoaded", () => {
+  if (!checkAdmin()) return;
+
+  loadCategories();
+});
 
 </script>
 

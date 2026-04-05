@@ -14,80 +14,90 @@
   <!-- AUTH BAR -->
   <div class="d-flex justify-content-between align-items-center mb-3">
 
-    <!-- LEFT: USER INFO -->
+    <!-- LEFT -->
     <div id="user-info" class="fw-bold"></div>
 
-    <!-- RIGHT: BUTTONS -->
+    <!-- RIGHT -->
     <div class="d-flex gap-2 align-items-center">
 
-      <!-- login/register -->
       <div id="auth-buttons">
         <a href="login.html" class="btn btn-primary">Đăng nhập</a>
         <a href="register.html" class="btn btn-success">Đăng ký</a>
       </div>
 
       <button id="logout-btn" class="btn btn-danger" onclick="logout()">
-  Đăng xuất
-</button>
+        Đăng xuất
+      </button>
 
     </div>
   </div>
 
-  <h1 class="text-center mb-4">Quản lý sản phẩm PC</h1>
+  <h1 class="text-center mb-4">PC Shop</h1>
 
-  <!-- CATEGORY BUTTON -->
-  <div class="text-end mb-3">
-    <a id="category-btn" href="category.html" class="btn btn-dark btn-lg">
-      Quản lý danh mục
-    </a>
-  </div>
+  <!-- ================= ADMIN VIEW ================= -->
+  <div id="admin-view">
 
-  <!-- FORM -->
-  <div class="card shadow p-4 mb-4">
-    <h4 class="mb-3">Thêm sản phẩm</h4>
+    <!-- CATEGORY -->
+    <div class="text-end mb-3">
+      <a id="category-btn" href="category.html" class="btn btn-dark btn-lg">
+        Quản lý danh mục
+      </a>
+    </div>
 
-    <div class="row g-2">
-      <div class="col-md-4">
-        <input id="name" class="form-control" placeholder="Tên sản phẩm">
-      </div>
+    <!-- FORM -->
+    <div class="card shadow p-4 mb-4">
+      <h4 class="mb-3">Thêm sản phẩm</h4>
 
-      <div class="col-md-2">
-        <input id="price" class="form-control" placeholder="Giá">
-      </div>
+      <div class="row g-2">
+        <div class="col-md-4">
+          <input id="name" class="form-control" placeholder="Tên sản phẩm">
+        </div>
 
-      <div class="col-md-3">
-        <select id="category" class="form-select"></select>
-      </div>
+        <div class="col-md-2">
+          <input id="price" class="form-control" placeholder="Giá">
+        </div>
 
-      <div class="col-md-2">
-        <input type="file" id="image" class="form-control">
-      </div>
+        <div class="col-md-3">
+          <select id="category" class="form-select"></select>
+        </div>
 
-      <div class="col-md-1">
-        <button id="add-btn" class="btn btn-primary w-100" onclick="addProduct()">+</button>
+        <div class="col-md-2">
+          <input type="file" id="image" class="form-control">
+        </div>
+
+        <div class="col-md-1">
+          <button id="add-btn" class="btn btn-primary w-100" onclick="addProduct()">+</button>
+        </div>
       </div>
     </div>
+
+    <!-- TABLE -->
+    <div class="card shadow">
+      <div class="card-body">
+        <table class="table table-bordered table-hover align-middle">
+          <thead class="table-dark text-center">
+            <tr>
+              <th>ID</th>
+              <th>Ảnh</th>
+              <th>Tên</th>
+              <th>Giá</th>
+              <th>Danh mục</th>
+              <th>Hành động</th>
+            </tr>
+          </thead>
+          <tbody id="product-table"></tbody>
+        </table>
+      </div>
+    </div>
+
   </div>
 
-  <!-- TABLE -->
-  <div class="card shadow">
-    <div class="card-body">
+  <!-- ================= USER VIEW ================= -->
+  <div id="user-view" style="display:none">
 
-      <table class="table table-bordered table-hover align-middle">
-        <thead class="table-dark text-center">
-          <tr>
-            <th>ID</th>
-            <th>Ảnh</th>
-            <th>Tên sản phẩm</th>
-            <th>Giá</th>
-            <th>Danh mục</th>
-            <th>Hành động</th>
-          </tr>
-        </thead>
-        <tbody id="product-table"></tbody>
-      </table>
+    <!-- DANH SÁCH SẢN PHẨM THEO DANH MỤC -->
+    <div id="user-product-container"></div>
 
-    </div>
   </div>
 
 </div>
@@ -98,73 +108,62 @@ let categories = [];
 
 const rawToken = localStorage.getItem('token');
 const role = localStorage.getItem('role');
-const token = rawToken ? 'Bearer ' + rawToken : null;
+const token = rawToken ? `Bearer ${rawToken}` : null;
 
+// ================= AUTH UI =================
 function initAuthUI() {
   const userInfo = document.getElementById('user-info');
   const authButtons = document.getElementById('auth-buttons');
   const logoutBtn = document.getElementById('logout-btn');
-  const categoryBtn = document.getElementById('category-btn');
-  const addBtn = document.getElementById('add-btn');
+
+  const adminView = document.getElementById('admin-view');
+  const userView = document.getElementById('user-view');
 
   // ===== CHƯA LOGIN =====
   if (!rawToken) {
-    userInfo.innerText = "Chưa đăng nhập";
+    userInfo.innerText = "Khách";
 
     authButtons.style.display = 'block';
-    logoutBtn.style.display = 'none'; // CHỈ ẨN Ở ĐÂY
+    logoutBtn.style.display = 'none';
 
-    if (categoryBtn) categoryBtn.style.display = 'none';
-    if (addBtn) addBtn.disabled = true;
+    adminView.style.display = 'none';
+    userView.style.display = 'block';
 
     return;
   }
 
-  // ===== ĐÃ LOGIN =====
   try {
     const payload = JSON.parse(atob(rawToken.split('.')[1]));
-
     userInfo.innerText = `${payload.username} | ${role}`;
 
     authButtons.style.display = 'none';
-    logoutBtn.style.display = 'inline-block'; // CHỈ HIỆN Ở ĐÂY
+    logoutBtn.style.display = 'inline-block';
 
   } catch (e) {
-    console.log("Token lỗi:", e);
     localStorage.clear();
     location.reload();
-    return;
   }
 
-  // ===== PHÂN QUYỀN =====
-  if (role !== 'ADMIN') {
-    if (categoryBtn) categoryBtn.style.display = 'none';
-    if (addBtn) addBtn.disabled = true;
-
-    disableAdminActions();
-  } else {
-    if (categoryBtn) categoryBtn.style.display = 'inline-block';
-    if (addBtn) addBtn.disabled = false;
+  // ===== ADMIN =====
+  if (role === 'ADMIN') {
+    adminView.style.display = 'block';
+    userView.style.display = 'none';
+  } 
+  // ===== USER =====
+  else {
+    adminView.style.display = 'none';
+    userView.style.display = 'block';
   }
 }
 
 // ================= ERROR =================
 function handleAuthError(res) {
   if (res.status === 401 || res.status === 403) {
-    alert("Hết phiên đăng nhập");
+    alert("Hết phiên hoặc không có quyền");
     logout();
     return true;
   }
   return false;
-}
-
-// ================= DISABLE =================
-function disableAdminActions() {
- document.querySelectorAll('.btn-warning, .btn-danger').forEach(btn => {
-  if (btn.id !== 'logout-btn') {
-    btn.style.display = 'none';
-  }
-});
 }
 
 // ================= LOGOUT =================
@@ -176,103 +175,217 @@ function logout() {
 // ================= CATEGORY =================
 function loadCategories() {
   fetch('/api/categories', {
-    headers: { Authorization: token }
+    headers: token ? { Authorization: token } : {}
   })
-    .then(res => {
-      if (handleAuthError(res)) return;
-      return res.json();
-    })
+    .then(res => res.json())
     .then(data => {
-      if (!data) return;
-
       categories = data;
 
+      // ADMIN select
       const select = document.getElementById('category');
-      if (!select) return;
-
-      select.innerHTML = '';
-
-      data.forEach(c => {
-        const option = document.createElement('option');
-        option.value = c.id;
-        option.innerText = c.name;
-        select.appendChild(option);
-      });
+      if (select) {
+        select.innerHTML = '';
+        data.forEach(c => {
+          const option = document.createElement('option');
+          option.value = c.id;
+          option.innerText = c.name;
+          select.appendChild(option);
+        });
+      }
     });
 }
 
 // ================= PRODUCT =================
 function loadProducts() {
   fetch('/api/products', {
-    headers: { Authorization: token }
+    headers: token ? { Authorization: token } : {}
   })
-    .then(res => {
-      if (handleAuthError(res)) return;
-      return res.json();
-    })
+    .then(res => res.json())
     .then(data => {
-      if (!data) return;
 
-      const table = document.getElementById('product-table');
-      table.innerHTML = '';
+      // ===== ADMIN TABLE =====
+      if (role === 'ADMIN') {
+        const table = document.getElementById('product-table');
+        table.innerHTML = '';
 
-      data.forEach(p => {
-        const row = document.createElement('tr');
+        data.forEach(p => {
+          const row = document.createElement('tr');
 
-        row.innerHTML = `
-          <td>${p.id}</td>
+          row.innerHTML = `
+            <td>${p.id}</td>
 
-          <td>
-            <img src="/uploads/${p.image || 'no-image.png'}"
-                 width="60" height="60"
-                 style="object-fit:cover; cursor:pointer"
-                 onclick="selectImage(${p.id})">
+            <td>
+              <img src="/uploads/${p.image || 'no-image.png'}"
+                   width="60" height="60"
+                   style="object-fit:cover; cursor:pointer"
+                   onclick="selectImage(${p.id})">
 
-            <input type="file" id="img-${p.id}" hidden onchange="uploadImage(${p.id})">
-          </td>
+              <input type="file" id="img-${p.id}" hidden onchange="uploadImage(${p.id})">
+            </td>
 
-          <td>
-            <input value="${p.name}" class="form-control" id="name-${p.id}" disabled>
-          </td>
+            <td><input value="${p.name}" class="form-control" id="name-${p.id}" disabled></td>
+            <td><input value="${p.price}" class="form-control" id="price-${p.id}" disabled></td>
 
-          <td>
-            <input value="${p.price}" class="form-control" id="price-${p.id}" disabled>
-          </td>
+            <td>
+              <select class="form-select" id="cat-${p.id}" disabled>
+                ${categories.map(c =>
+                  `<option value="${c.id}" ${c.id == p.category_id ? 'selected' : ''}>${c.name}</option>`
+                ).join('')}
+              </select>
+            </td>
 
-          <td>
-            <select class="form-select" id="cat-${p.id}" disabled>
-              ${categories.map(c =>
-                `<option value="${c.id}" ${c.id == p.category_id ? 'selected' : ''}>${c.name}</option>`
-              ).join('')}
-            </select>
-          </td>
+            <td class="text-center">
+              <button class="btn btn-sm btn-warning mb-1" id="btn-${p.id}" onclick="toggleEdit(${p.id})">Sửa</button>
+              <button class="btn btn-sm btn-danger" onclick="deleteProduct(${p.id})">Xóa</button>
+            </td>
+          `;
 
-          <td class="text-center">
-            ${role === 'ADMIN' ? `
-              <button class="btn btn-sm btn-warning mb-1" id="btn-${p.id}" onclick="toggleEdit(${p.id})">
-                Sửa
-              </button>
+          table.appendChild(row);
+        });
+      }
 
-              <button class="btn btn-sm btn-danger" onclick="deleteProduct(${p.id})">
-                Xóa
-              </button>
-            ` : ''}
-          </td>
-        `;
-
-        table.appendChild(row);
-      });
+      // ===== USER CARD =====
+      else {
+        renderUserProducts(data);
+      }
     });
+}
+
+// ================= USER VIEW =================
+function renderUserProducts(products) {
+  const container = document.getElementById('user-product-container');
+  container.innerHTML = '';
+
+  categories.forEach(cat => {
+    const catDiv = document.createElement('div');
+    catDiv.className = 'mb-4';
+
+    catDiv.innerHTML = `<h4 class="mb-3">${cat.name}</h4>`;
+
+    const row = document.createElement('div');
+    row.className = 'row';
+
+    const filtered = products.filter(p => p.category_id == cat.id);
+
+    filtered.forEach(p => {
+      const col = document.createElement('div');
+      col.className = 'col-md-3 mb-3';
+
+      col.innerHTML = `
+        <div class="card h-100 shadow-sm">
+          <img src="/uploads/${p.image || 'no-image.png'}" class="card-img-top" style="height:150px;object-fit:cover">
+
+          <div class="card-body">
+            <h6>${p.name}</h6>
+            <p class="text-danger fw-bold">${p.price} VND</p>
+
+            <button class="btn btn-success w-100" onclick="addToCart(${p.id})">
+              Thêm vào giỏ
+            </button>
+          </div>
+        </div>
+      `;
+
+      row.appendChild(col);
+    });
+
+    catDiv.appendChild(row);
+    container.appendChild(catDiv);
+  });
+}
+
+// ================= CART (demo) =================
+function addToCart(id) {
+  alert("Đã thêm sản phẩm ID " + id + " vào giỏ");
+}
+
+// ================= ADMIN ACTION =================
+function addProduct() {
+  if (role !== 'ADMIN') return alert("Không có quyền");
+
+  const formData = new FormData();
+  formData.append('name', document.getElementById('name').value);
+  formData.append('price', document.getElementById('price').value);
+  formData.append('category_id', document.getElementById('category').value);
+  formData.append('image', document.getElementById('image').files[0]);
+
+  fetch('/api/products', {
+    method: 'POST',
+    headers: { Authorization: token },
+    body: formData
+  }).then(() => loadProducts());
+}
+
+function updateProduct(id) {
+  fetch('/api/products/' + id, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: token
+    },
+    body: JSON.stringify({
+      name: document.getElementById('name-' + id).value,
+      price: document.getElementById('price-' + id).value,
+      category_id: document.getElementById('cat-' + id).value
+    })
+  });
+}
+
+function deleteProduct(id) {
+  if (!confirm("Xóa sản phẩm?")) return;
+
+  fetch('/api/products/' + id, {
+    method: 'DELETE',
+    headers: { Authorization: token }
+  }).then(() => loadProducts());
+}
+
+function selectImage(id) {
+  document.getElementById('img-' + id).click();
+}
+
+function uploadImage(id) {
+  const file = document.getElementById('img-' + id).files[0];
+
+  const formData = new FormData();
+  formData.append('image', file);
+
+  fetch('/api/products/upload/' + id, {
+    method: 'PUT',
+    headers: { Authorization: token },
+    body: formData
+  }).then(() => loadProducts());
+}
+
+function toggleEdit(id) {
+  const name = document.getElementById('name-' + id);
+  const price = document.getElementById('price-' + id);
+  const cat = document.getElementById('cat-' + id);
+  const btn = document.getElementById('btn-' + id);
+
+  const isDisabled = name.disabled;
+
+  if (isDisabled) {
+    name.disabled = false;
+    price.disabled = false;
+    cat.disabled = false;
+    btn.innerText = 'Xác nhận';
+    btn.classList.replace('btn-warning', 'btn-success');
+  } else {
+    updateProduct(id);
+    name.disabled = true;
+    price.disabled = true;
+    cat.disabled = true;
+    btn.innerText = 'Sửa';
+    btn.classList.replace('btn-success', 'btn-warning');
+  }
 }
 
 // ================= INIT =================
 document.addEventListener("DOMContentLoaded", () => {
   initAuthUI();
-
-  if (rawToken) {
-    loadCategories();
-    loadProducts();
-  }
+  loadCategories();
+  loadProducts();
 });
 
 </script>
