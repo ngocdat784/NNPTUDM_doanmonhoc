@@ -9,25 +9,50 @@
 
 <body class="bg-light">
 
-<div class="container mt-5">
+<div class="container mt-4">
+
+  <!-- AUTH BAR -->
+  <div class="d-flex justify-content-between align-items-center mb-3">
+
+    <!-- LEFT: USER INFO -->
+    <div id="user-info" class="fw-bold"></div>
+
+    <!-- RIGHT: BUTTONS -->
+    <div class="d-flex gap-2 align-items-center">
+
+      <!-- login/register -->
+      <div id="auth-buttons">
+        <a href="login.html" class="btn btn-primary">Đăng nhập</a>
+        <a href="register.html" class="btn btn-success">Đăng ký</a>
+      </div>
+
+      <button id="logout-btn" class="btn btn-danger" onclick="logout()">
+  Đăng xuất
+</button>
+
+    </div>
+  </div>
 
   <h1 class="text-center mb-4">Quản lý sản phẩm PC</h1>
-<div class="text-end mb-3">
-  <a href="category.html" class="btn btn-dark btn-lg">
-    Quản lý danh mục
-  </a>
-</div>
+
+  <!-- CATEGORY BUTTON -->
+  <div class="text-end mb-3">
+    <a id="category-btn" href="category.html" class="btn btn-dark btn-lg">
+      Quản lý danh mục
+    </a>
+  </div>
+
   <!-- FORM -->
   <div class="card shadow p-4 mb-4">
     <h4 class="mb-3">Thêm sản phẩm</h4>
 
     <div class="row g-2">
       <div class="col-md-4">
-        <input id="name" class="form-control" placeholder="Tên sản phẩm (ví dụ: CPU Intel i7 12700K)">
+        <input id="name" class="form-control" placeholder="Tên sản phẩm">
       </div>
 
       <div class="col-md-2">
-        <input id="price" class="form-control" placeholder="Giá (VD: 5000000)">
+        <input id="price" class="form-control" placeholder="Giá">
       </div>
 
       <div class="col-md-3">
@@ -39,7 +64,7 @@
       </div>
 
       <div class="col-md-1">
-        <button class="btn btn-primary w-100" onclick="addProduct()">+</button>
+        <button id="add-btn" class="btn btn-primary w-100" onclick="addProduct()">+</button>
       </div>
     </div>
   </div>
@@ -71,14 +96,100 @@
 
 let categories = [];
 
+const rawToken = localStorage.getItem('token');
+const role = localStorage.getItem('role');
+const token = rawToken ? 'Bearer ' + rawToken : null;
+
+function initAuthUI() {
+  const userInfo = document.getElementById('user-info');
+  const authButtons = document.getElementById('auth-buttons');
+  const logoutBtn = document.getElementById('logout-btn');
+  const categoryBtn = document.getElementById('category-btn');
+  const addBtn = document.getElementById('add-btn');
+
+  // ===== CHƯA LOGIN =====
+  if (!rawToken) {
+    userInfo.innerText = "Chưa đăng nhập";
+
+    authButtons.style.display = 'block';
+    logoutBtn.style.display = 'none'; // CHỈ ẨN Ở ĐÂY
+
+    if (categoryBtn) categoryBtn.style.display = 'none';
+    if (addBtn) addBtn.disabled = true;
+
+    return;
+  }
+
+  // ===== ĐÃ LOGIN =====
+  try {
+    const payload = JSON.parse(atob(rawToken.split('.')[1]));
+
+    userInfo.innerText = `${payload.username} | ${role}`;
+
+    authButtons.style.display = 'none';
+    logoutBtn.style.display = 'inline-block'; // CHỈ HIỆN Ở ĐÂY
+
+  } catch (e) {
+    console.log("Token lỗi:", e);
+    localStorage.clear();
+    location.reload();
+    return;
+  }
+
+  // ===== PHÂN QUYỀN =====
+  if (role !== 'ADMIN') {
+    if (categoryBtn) categoryBtn.style.display = 'none';
+    if (addBtn) addBtn.disabled = true;
+
+    disableAdminActions();
+  } else {
+    if (categoryBtn) categoryBtn.style.display = 'inline-block';
+    if (addBtn) addBtn.disabled = false;
+  }
+}
+
+// ================= ERROR =================
+function handleAuthError(res) {
+  if (res.status === 401 || res.status === 403) {
+    alert("Hết phiên đăng nhập");
+    logout();
+    return true;
+  }
+  return false;
+}
+
+// ================= DISABLE =================
+function disableAdminActions() {
+ document.querySelectorAll('.btn-warning, .btn-danger').forEach(btn => {
+  if (btn.id !== 'logout-btn') {
+    btn.style.display = 'none';
+  }
+});
+}
+
+// ================= LOGOUT =================
+function logout() {
+  localStorage.clear();
+  window.location.href = 'login.html';
+}
+
 // ================= CATEGORY =================
 function loadCategories() {
-  fetch('/api/categories')
-    .then(res => res.json())
+  fetch('/api/categories', {
+    headers: { Authorization: token }
+  })
+    .then(res => {
+      if (handleAuthError(res)) return;
+      return res.json();
+    })
     .then(data => {
+      if (!data) return;
+
       categories = data;
 
       const select = document.getElementById('category');
+      if (!select) return;
+
       select.innerHTML = '';
 
       data.forEach(c => {
@@ -92,15 +203,20 @@ function loadCategories() {
 
 // ================= PRODUCT =================
 function loadProducts() {
-  fetch('/api/products')
-    .then(res => res.json())
+  fetch('/api/products', {
+    headers: { Authorization: token }
+  })
+    .then(res => {
+      if (handleAuthError(res)) return;
+      return res.json();
+    })
     .then(data => {
+      if (!data) return;
 
       const table = document.getElementById('product-table');
       table.innerHTML = '';
 
       data.forEach(p => {
-
         const row = document.createElement('tr');
 
         row.innerHTML = `
@@ -132,13 +248,15 @@ function loadProducts() {
           </td>
 
           <td class="text-center">
-            <button class="btn btn-sm btn-warning mb-1" id="btn-${p.id}" onclick="toggleEdit(${p.id})">
-              Sửa
-            </button>
+            ${role === 'ADMIN' ? `
+              <button class="btn btn-sm btn-warning mb-1" id="btn-${p.id}" onclick="toggleEdit(${p.id})">
+                Sửa
+              </button>
 
-            <button class="btn btn-sm btn-danger" onclick="deleteProduct(${p.id})">
-              Xóa
-            </button>
+              <button class="btn btn-sm btn-danger" onclick="deleteProduct(${p.id})">
+                Xóa
+              </button>
+            ` : ''}
           </td>
         `;
 
@@ -147,99 +265,15 @@ function loadProducts() {
     });
 }
 
-// ================= ADD =================
-function addProduct() {
-  const name = document.getElementById('name').value;
-  const price = document.getElementById('price').value;
-  const category_id = document.getElementById('category').value;
-  const image = document.getElementById('image').files[0];
+// ================= INIT =================
+document.addEventListener("DOMContentLoaded", () => {
+  initAuthUI();
 
-  const formData = new FormData();
-  formData.append('name', name);
-  formData.append('price', price);
-  formData.append('category_id', category_id);
-  formData.append('image', image);
-
-  fetch('/api/products', {
-    method: 'POST',
-    body: formData
-  }).then(() => loadProducts());
-}
-
-// ================= TOGGLE EDIT =================
-function toggleEdit(id) {
-  const name = document.getElementById('name-' + id);
-  const price = document.getElementById('price-' + id);
-  const cat = document.getElementById('cat-' + id);
-  const btn = document.getElementById('btn-' + id);
-
-  const isDisabled = name.disabled;
-
-  if (isDisabled) {
-    // bật sửa
-    name.disabled = false;
-    price.disabled = false;
-    cat.disabled = false;
-
-    btn.innerText = 'Xác nhận';
-    btn.classList.remove('btn-warning');
-    btn.classList.add('btn-success');
-  } else {
-    // xác nhận → update
-    updateProduct(id);
-
-    name.disabled = true;
-    price.disabled = true;
-    cat.disabled = true;
-
-    btn.innerText = 'Sửa';
-    btn.classList.remove('btn-success');
-    btn.classList.add('btn-warning');
+  if (rawToken) {
+    loadCategories();
+    loadProducts();
   }
-}
-
-// ================= UPDATE =================
-function updateProduct(id) {
-  const name = document.getElementById('name-' + id).value;
-  const price = document.getElementById('price-' + id).value;
-  const category_id = document.getElementById('cat-' + id).value;
-
-  fetch('/api/products/' + id, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ name, price, category_id })
-  });
-}
-
-// ================= DELETE =================
-function deleteProduct(id) {
-  if (!confirm("Xóa sản phẩm?")) return;
-
-  fetch('/api/products/' + id, {
-    method: 'DELETE'
-  }).then(() => loadProducts());
-}
-
-// ================= IMAGE =================
-function selectImage(id) {
-  document.getElementById('img-' + id).click();
-}
-
-function uploadImage(id) {
-  const file = document.getElementById('img-' + id).files[0];
-
-  const formData = new FormData();
-  formData.append('image', file);
-
-  fetch('/api/products/upload/' + id, {
-    method: 'PUT',
-    body: formData
-  }).then(() => loadProducts());
-}
-
-// INIT
-loadCategories();
-setTimeout(loadProducts, 300);
+});
 
 </script>
 
