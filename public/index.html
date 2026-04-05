@@ -60,6 +60,24 @@
   </div>
 
   <h1 class="text-center mb-4">PC Shop</h1>
+  <!-- 🔍 SEARCH -->
+<div class="mb-4 position-relative">
+
+  <input 
+    id="search-input"
+    type="text" 
+    class="form-control"
+    placeholder="Tìm sản phẩm hoặc danh mục..."
+    oninput="handleSearch()"
+  >
+
+  <!-- GỢI Ý -->
+  <div id="search-suggest"
+       class="list-group position-absolute w-100 shadow"
+       style="z-index:999; display:none;">
+  </div>
+
+</div>
 
   <!-- ================= ADMIN VIEW ================= -->
   <div id="admin-view">
@@ -136,7 +154,7 @@
 <script>
 
 let categories = [];
-
+let allProducts = [];
 const rawToken = localStorage.getItem('token');
 const role = localStorage.getItem('role');
 const token = rawToken ? `Bearer ${rawToken}` : null;
@@ -255,6 +273,9 @@ function loadProducts() {
   })
     .then(res => res.json())
     .then(data => {
+
+      // 🔥 LƯU DATA CHO SEARCH
+      allProducts = data;
 
       // ===== ADMIN TABLE =====
       if (role === 'ADMIN') {
@@ -586,8 +607,55 @@ function toggleEdit(id) {
     btn.classList.replace('btn-success', 'btn-warning');
   }
 }
+function handleSearch() {
+  const keyword = document.getElementById('search-input').value.toLowerCase();
+  const suggestBox = document.getElementById('search-suggest');
+
+  // ===== EMPTY → TRẢ LẠI GIAO DIỆN =====
+  if (!keyword) {
+    suggestBox.style.display = 'none';
+    loadProducts();
+    return;
+  }
+
+  // ===== FILTER =====
+  const filtered = allProducts.filter(p =>
+    p.name.toLowerCase().includes(keyword) ||
+    (p.category_name && p.category_name.toLowerCase().includes(keyword))
+  );
+
+  // ===== RENDER PRODUCT =====
+  renderUserProducts(filtered);
+
+  // ===== GỢI Ý =====
+  suggestBox.innerHTML = '';
+
+  const suggestions = filtered.slice(0, 5);
+
+  suggestions.forEach(p => {
+    const item = document.createElement('div');
+    item.className = 'list-group-item list-group-item-action';
+
+    item.innerText = `${p.name} (${p.category_name || ''})`;
+
+    item.onclick = () => {
+      document.getElementById('search-input').value = p.name;
+      suggestBox.style.display = 'none';
+      renderUserProducts([p]);
+    };
+
+    suggestBox.appendChild(item);
+  });
+
+  suggestBox.style.display = suggestions.length ? 'block' : 'none';
+}
 document.getElementById('cart-icon')?.addEventListener('click', () => {
   window.location.href = 'cart.html';
+});
+document.addEventListener('click', (e) => {
+  if (!e.target.closest('#search-input')) {
+    document.getElementById('search-suggest').style.display = 'none';
+  }
 });
 document.addEventListener("DOMContentLoaded", () => {
   initAuthUI();
