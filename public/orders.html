@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <title>Đơn hàng</title>
+
+  <!-- Bootstrap -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+
+<body class="bg-light">
+
+<div class="container mt-4">
+
+  <!-- HEADER -->
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <h3>Đơn hàng</h3>
+
+    <div>
+      <button class="btn btn-secondary me-2" onclick="goHome()">Trang chủ</button>
+    </div>
+  </div>
+
+  <!-- LIST -->
+  <div id="order-container"></div>
+
+</div>
+
+<script>
+const rawToken = localStorage.getItem('token');
+const role = localStorage.getItem('role');
+const token = rawToken ? `Bearer ${rawToken}` : null;
+
+// ================= ERROR =================
+function handleAuthError(res) {
+  if (res.status === 401 || res.status === 403) {
+    alert("Hết phiên, vui lòng đăng nhập lại");
+    localStorage.clear();
+    window.location.href = 'login.html';
+    return true;
+  }
+  return false;
+}
+
+// ================= API =================
+async function apiFetch(url, options = {}) {
+  const res = await fetch(url, {
+    ...options,
+    headers: {
+      ...(options.headers || {}),
+      Authorization: token
+    }
+  });
+
+  if (handleAuthError(res)) return null;
+  return res;
+}
+
+// ================= LOAD =================
+async function loadOrders() {
+  const res = await apiFetch('/api/orders');
+  if (!res) return;
+
+  const data = await res.json();
+  renderOrders(data);
+}
+
+// ================= RENDER =================
+function renderOrders(orders) {
+  const container = document.getElementById('order-container');
+  container.innerHTML = '';
+
+  if (!orders || orders.length === 0) {
+    container.innerHTML = "<p>Chưa có đơn hàng</p>";
+    return;
+  }
+
+  orders.forEach(order => {
+
+    const div = document.createElement('div');
+    div.className = 'card mb-3 shadow-sm';
+
+    div.innerHTML = `
+      <div class="card-body">
+
+        <div class="d-flex justify-content-between">
+          <div>
+            <b>Đơn #${order.id}</b><br>
+            <small>${order.created_at}</small>
+          </div>
+
+          <div>
+            ${renderStatus(order)}
+          </div>
+        </div>
+
+        <hr>
+
+        <ul class="mb-2">
+          ${order.items.map(i => `
+            <li>${i.name} x ${i.quantity}</li>
+          `).join('')}
+        </ul>
+
+        <div class="text-end fw-bold">
+          Tổng: <span class="text-danger">${order.total} VND</span>
+        </div>
+
+      </div>
+    `;
+
+    container.appendChild(div);
+  });
+}
+
+// ================= STATUS UI =================
+function renderStatus(order) {
+
+  const colorMap = {
+    PENDING: 'secondary',
+    CONFIRMED: 'primary',
+    SHIPPING: 'warning',
+    DONE: 'success',
+    CANCELLED: 'danger'
+  };
+
+  // ===== ADMIN =====
+  if (role === 'ADMIN') {
+    return `
+      <select class="form-select form-select-sm"
+              onchange="updateStatus(${order.id}, this.value)">
+        ${['PENDING','CONFIRMED','SHIPPING','DONE','CANCELLED']
+          .map(s => `
+            <option value="${s}" ${s === order.status ? 'selected' : ''}>
+              ${s}
+            </option>
+          `).join('')
+        }
+      </select>
+    `;
+  }
+
+  // ===== USER =====
+  return `<span class="badge bg-${colorMap[order.status] || 'secondary'}">
+            ${order.status}
+          </span>`;
+}
+
+// ================= UPDATE STATUS =================
+async function updateStatus(id, status) {
+  const res = await apiFetch('/api/orders/' + id + '/status', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ status })
+  });
+
+  if (!res) return;
+
+  loadOrders();
+}
+
+// ================= NAV =================
+function goHome() {
+  window.location.href = 'index.html';
+}
+
+// ================= INIT =================
+document.addEventListener("DOMContentLoaded", () => {
+  if (!rawToken) {
+    alert("Vui lòng đăng nhập");
+    window.location.href = 'login.html';
+    return;
+  }
+
+  loadOrders();
+});
+</script>
+
+</body>
+</html>

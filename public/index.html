@@ -40,6 +40,13 @@
         </span>
       </div>
 
+      <!-- 🧾 ORDER BUTTON -->
+      <div id="order-btn" style="display:none;">
+        <a id="order-link" href="orders.html" class="btn btn-info">
+          Đơn hàng
+        </a>
+      </div>
+
       <div id="auth-buttons">
         <a href="login.html" class="btn btn-primary">Đăng nhập</a>
         <a href="register.html" class="btn btn-success">Đăng ký</a>
@@ -118,17 +125,14 @@
     <!-- DANH SÁCH SẢN PHẨM -->
     <div id="user-product-container"></div>
 
-    
-
   </div>
 
 </div>
 
-<!-- Bootstrap Icons (QUAN TRỌNG để hiện icon giỏ) -->
+<!-- Bootstrap Icons -->
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
 
 </body>
-
 <script>
 
 let categories = [];
@@ -144,6 +148,10 @@ function initAuthUI() {
   const logoutBtn = document.getElementById('logout-btn');
   const cartIcon = document.getElementById('cart-icon');
 
+  // 🧾 NEW
+  const orderBtn = document.getElementById('order-btn');
+  const orderLink = document.getElementById('order-link');
+
   const adminView = document.getElementById('admin-view');
   const userView = document.getElementById('user-view');
 
@@ -156,6 +164,10 @@ function initAuthUI() {
 
     adminView.style.display = 'none';
     userView.style.display = 'block';
+
+    // 🔥 thêm
+    if (cartIcon) cartIcon.style.display = 'none';
+    if (orderBtn) orderBtn.style.display = 'none';
 
     return;
   }
@@ -176,17 +188,25 @@ function initAuthUI() {
   if (role === 'ADMIN') {
     adminView.style.display = 'block';
     userView.style.display = 'none';
+
+    if (cartIcon) cartIcon.style.display = 'none';
+
+    // 🧾 ADMIN ORDER
+    if (orderBtn) orderBtn.style.display = 'block';
+    if (orderLink) orderLink.innerText = 'Quản lý đơn hàng';
   } 
+
   // ===== USER =====
   else {
     adminView.style.display = 'none';
     userView.style.display = 'block';
+
+    if (cartIcon) cartIcon.style.display = 'block';
+
+    // 🧾 USER ORDER
+    if (orderBtn) orderBtn.style.display = 'block';
+    if (orderLink) orderLink.innerText = 'Lịch sử đơn hàng';
   }
-  if (role === 'ADMIN') {
-  if (cartIcon) cartIcon.style.display = 'none';
-} else {
-  if (cartIcon) cartIcon.style.display = 'block';
-}
 }
 
 // ================= ERROR =================

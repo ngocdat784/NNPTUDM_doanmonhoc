@@ -386,7 +386,152 @@ app.delete('/api/cart/:id', verifyToken, async (req, res) => {
     res.status(500).send("Lỗi server");
   }
 });
+app.post('/api/orders/checkout', verifyToken, async (req, res) => {
+  try {
+    const userId = req.user.id;
 
+    const cartId = await getCart(userId);
+
+    // 1. Lấy giỏ hàng
+    const items = await query(`
+      SELECT ci.*, p.price
+      FROM cart_items ci
+      JOIN products p ON ci.product_id = p.id
+      WHERE ci.cart_id = ?
+    `, [cartId]);
+
+    if (items.length === 0) {
+      return res.status(400).send("Giỏ hàng trống");
+    }
+
+    // 2. Tính tổng tiền
+    let total = 0;
+    items.forEach(i => {
+      total += i.price * i.quantity;
+    });
+
+    const orderResult = await query(
+  'INSERT INTO orders (user_id, total, status) VALUES (?, ?, ?)',
+  [userId, total, 'PENDING']
+);
+
+    const orderId = orderResult.insertId;
+
+    // 4. Lưu order_items
+    for (let item of items) {
+      await query(
+        'INSERT INTO order_items (order_id, product_id, quantity, price) VALUES (?, ?, ?, ?)',
+        [orderId, item.product_id, item.quantity, item.price]
+      );
+    }
+
+    // 5. Xóa giỏ hàng
+    await query(
+      'DELETE FROM cart_items WHERE cart_id = ?',
+      [cartId]
+    );
+
+    res.json({
+      message: "Đặt hàng thành công",
+      orderId: orderId
+    });
+
+  } catch (err) {
+    console.error(err);
+    res.status(500).send("Lỗi server");
+  }
+});
+app.get('/api/orders', verifyToken, async (req, res) => {
+  try {
+    let orders;
+
+    // ===== ADMIN =====
+    if (req.user.role === 'ADMIN') {
+      orders = await query(
+        'SELECT * FROM orders ORDER BY created_at DESC'
+      );
+    } 
+    // ===== USER =====
+    else {
+      orders = await query(
+        'SELECT * FROM orders WHERE user_id=? ORDER BY created_at DESC',
+        [req.user.id]
+      );
+    }
+
+    // ===== LẤY CHI TIẾT =====
+    for (let order of orders) {
+      const items = await query(`
+        SELECT oi.*, p.name
+        FROM order_items oi
+        JOIN products p ON oi.product_id = p.id
+        WHERE oi.order_id = ?
+      `, [order.id]);
+
+      order.items = items;
+    }
+
+    res.json(orders);
+
+  } catch (err) {
+    console.error(err);
+    res.status(500).send("Lỗi server");
+  }
+});
+app.put('/api/orders/:id/status', verifyToken, isAdmin, async (req, res) => {
+  try {
+    const { status } = req.body;
+
+    // VALIDATE
+    const validStatus = ['PENDING','CONFIRMED','SHIPPING','DONE','CANCELLED'];
+    if (!validStatus.includes(status)) {
+      return res.status(400).send("Status không hợp lệ");
+    }
+
+    await query(
+      'UPDATE orders SET status=? WHERE id=?',
+      [status, req.params.id]
+    );
+
+    res.send("Cập nhật trạng thái thành công");
+
+  } catch (err) {
+    console.error(err);
+    res.status(500).send("Lỗi server");
+  }
+});
+app.get('/api/orders/:id', verifyToken, async (req, res) => {
+  try {
+    const order = await query(
+      'SELECT * FROM orders WHERE id=?',
+      [req.params.id]
+    );
+
+    if (order.length === 0) {
+      return res.status(404).send("Không tìm thấy đơn");
+    }
+
+    // USER chỉ xem đơn của mình
+    if (req.user.role !== 'ADMIN' && order[0].user_id !== req.user.id) {
+      return res.status(403).send("Không có quyền");
+    }
+
+    const items = await query(`
+      SELECT oi.*, p.name
+      FROM order_items oi
+      JOIN products p ON oi.product_id = p.id
+      WHERE oi.order_id = ?
+    `, [req.params.id]);
+
+    order[0].items = items;
+
+    res.json(order[0]);
+
+  } catch (err) {
+    console.error(err);
+    res.status(500).send("Lỗi server");
+  }
+});
 app.listen(PORT, () => {
   console.log(`Server chạy tại http://localhost:${PORT}`);
 

@@ -71,7 +71,6 @@ function renderCart(items) {
   const container = document.getElementById('cart-container');
   container.innerHTML = '';
 
-  // ===== EMPTY =====
   if (!items || items.length === 0) {
     container.innerHTML = "<p>Giỏ hàng trống</p>";
     return;
@@ -176,9 +175,28 @@ async function clearCart() {
   loadCart();
 }
 
-// ================= CHECKOUT (FAKE) =================
-function checkout() {
-  alert("Thanh toán thành công (demo)");
+// ================= CHECKOUT (REAL) =================
+async function checkout() {
+  if (!confirm("Xác nhận thanh toán?")) return;
+
+  try {
+    const res = await apiFetch('/api/orders/checkout', {
+      method: 'POST'
+    });
+
+    if (!res) return;
+
+    const data = await res.json();
+
+    alert("Đặt hàng thành công! Mã đơn: " + data.orderId);
+
+    // 👉 chuyển sang trang đơn hàng
+    window.location.href = 'orders.html';
+
+  } catch (err) {
+    console.error(err);
+    alert("Lỗi khi thanh toán");
+  }
 }
 
 // ================= NAV =================
