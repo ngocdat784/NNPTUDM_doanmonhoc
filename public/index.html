@@ -399,6 +399,25 @@ function renderUserProducts(products) {
                style="height:150px;object-fit:cover">
 
           <div class="card-body">
+            <div class="mt-2">
+  <select id="rating-${p.id}" class="form-select form-select-sm mb-1">
+    <option value="">Chọn sao</option>
+    <option value="5">⭐⭐⭐⭐⭐</option>
+    <option value="4">⭐⭐⭐⭐</option>
+    <option value="3">⭐⭐⭐</option>
+    <option value="2">⭐⭐</option>
+    <option value="1">⭐</option>
+  </select>
+
+  <input id="comment-${p.id}" class="form-control form-control-sm mb-1" placeholder="Nhận xét">
+
+  <button class="btn btn-sm btn-warning w-100"
+          onclick="submitReview(${p.id})">
+    Đánh giá
+  </button>
+
+  <div id="review-list-${p.id}" class="mt-2"></div>
+</div>
             <h6>${p.name}</h6>
             <p class="text-danger fw-bold">${p.price} VND</p>
 
@@ -410,6 +429,7 @@ function renderUserProducts(products) {
       `;
 
       row.appendChild(col);
+      setTimeout(() => loadReviews(p.id), 0);
     });
 
     catDiv.appendChild(row);
@@ -820,6 +840,72 @@ function handleSearch() {
 
     return;
   }
+  async function submitReview(productId) {
+  const rating = document.getElementById(`rating-${productId}`).value;
+  const comment = document.getElementById(`comment-${productId}`).value;
+
+  if (!rating) {
+    return alert("Chọn số sao");
+  }
+
+  const res = await apiFetch('/api/reviews', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      product_id: productId,
+      rating: rating,
+      comment: comment
+    })
+  });
+
+  if (!res) return;
+
+  alert("Đã đánh giá");
+  loadReviews(productId);
+}
+async function loadReviews(productId) {
+  const res = await fetch(`/api/reviews/${productId}`);
+  const data = await res.json();
+
+  renderReviews(productId, data);
+}
+function renderReviews(productId, reviews) {
+  const container = document.getElementById(`review-list-${productId}`);
+  if (!container) return;
+
+  container.innerHTML = '';
+
+  if (reviews.length === 0) {
+    container.innerHTML = "<p>Chưa có đánh giá</p>";
+    return;
+  }
+
+  let total = 0;
+
+  reviews.forEach(r => {
+    total += r.rating;
+
+    const div = document.createElement('div');
+    div.className = 'border p-2 mb-2';
+
+    div.innerHTML = `
+      <b>${r.username || 'User'}</b> ⭐ ${r.rating}/5 <br>
+      <small>${r.comment || ''}</small>
+    `;
+
+    container.appendChild(div);
+  });
+
+  const avg = (total / reviews.length).toFixed(1);
+
+  const avgDiv = document.createElement('div');
+  avgDiv.className = 'fw-bold text-danger mb-2';
+  avgDiv.innerText = `⭐ Trung bình: ${avg}/5`;
+
+  container.prepend(avgDiv);
+}
 
   // ===== FILTER =====
   const filtered = allProducts.filter(p =>

@@ -589,7 +589,64 @@ app.get('/api/products/recommend', verifyToken, async (req, res) => {
     res.status(500).send("Lỗi server");
   }
 });
+app.post('/api/reviews', verifyToken, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { product_id, rating, comment } = req.body;
 
+    const existing = await query(
+      'SELECT * FROM product_reviews WHERE user_id=? AND product_id=?',
+      [userId, product_id]
+    );
+
+    if (existing.length > 0) {
+      // UPDATE
+      await query(
+        'UPDATE product_reviews SET rating=?, comment=? WHERE user_id=? AND product_id=?',
+        [rating, comment, userId, product_id]
+      );
+    } else {
+      // INSERT
+      await query(
+        'INSERT INTO product_reviews (user_id, product_id, rating, comment) VALUES (?, ?, ?, ?)',
+        [userId, product_id, rating, comment]
+      );
+    }
+
+    res.send("Đánh giá thành công");
+  } catch (err) {
+    console.error(err);
+    res.status(500).send("Lỗi server");
+  }
+});
+app.get('/api/reviews/:productId', async (req, res) => {
+  try {
+    const data = await query(`
+      SELECT r.*, u.username
+      FROM product_reviews r
+      JOIN users u ON r.user_id = u.id
+      WHERE r.product_id = ?
+      ORDER BY r.created_at DESC
+    `, [req.params.productId]);
+
+    res.json(data);
+  } catch (err) {
+    res.status(500).send("Lỗi server");
+  }
+});
+app.get('/api/reviews/avg/:productId', async (req, res) => {
+  try {
+    const result = await query(`
+      SELECT AVG(rating) as avg_rating, COUNT(*) as total
+      FROM product_reviews
+      WHERE product_id = ?
+    `, [req.params.productId]);
+
+    res.json(result[0]);
+  } catch (err) {
+    res.status(500).send("Lỗi server");
+  }
+});
 app.listen(PORT, () => {
   console.log(`Server chạy tại http://localhost:${PORT}`);
 
